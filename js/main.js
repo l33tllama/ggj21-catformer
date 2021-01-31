@@ -9,6 +9,9 @@ var ground = null;
 var grounds = [];
 var buildings = [];
 var hero_start_pos = null;
+var deadly_tiles = [];
+var win_obj = null;
+var godmode = false;
 
 var createDefaultEngine = function() { return new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true,  disableWebGL2Support: false}); };
 
@@ -28,7 +31,7 @@ function createHouse(position, scene){
 
 function createBuilding(position, scene){
 
-    let height = Math.floor(Math.random() * 5);
+    let height = Math.floor(Math.random() * 2);
 
     let faceUV = [];
     faceUV[0] = new BABYLON.Vector4(0.75, 0.33, 1, 0.66); //rear face
@@ -70,7 +73,7 @@ function createBuilding(position, scene){
         restitution:0}, scene);
         boxTop.material = topMat;
         boxTop.position = position.clone();
-        boxTop.position.y = 2 + 4 * (height + 1) + 4;
+        boxTop.position.y = 2 + 4 * (height + 1);
     buildings.push(boxTop);
 }
 
@@ -78,12 +81,14 @@ function loadCat(position, scene){
     const collBox = BABYLON.MeshBuilder.CreateBox("hero-col-box", {width: 0.4, height: 0.2, depth: 0.4});
     collBox.physicsImpostor = new BABYLON.PhysicsImpostor(collBox, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 10, friction: 10, restitution: 0.01 }, scene);
     collBox.showBoundingBox = true;
-    //collBox.isVisible = false;
+    collBox.isVisible = false;
     collBox.position = position.clone();
 
     collBox.position.y = 1;
 
     hero_start_pos = collBox.position.clone();
+
+    var cat_scream = new BABYLON.Sound("gunshot", "res/snd/415209__inspectorj__cat-screaming-a.wav", scene);
     //collBox.rotate(new BABYLON.Vector3(0, 1, 0), Math.PI/2);
      // Load hero character and play animation
      BABYLON.SceneLoader.ImportMesh("", "./meshes/", "StripeTheCat.glb", scene, function (newMeshes, particleSystems, skeletons, animationGroups) {
@@ -131,6 +136,22 @@ function loadCat(position, scene){
                     collBox.physicsImpostor.setAngularVelocity(new BABYLON.Vector3(0, 0, 0));
                 }
             }
+            if(!godmode){
+                for(let i = 0; i < deadly_tiles.length; i++){
+                    let t = deadly_tiles[i];
+                    if(collBox.intersectsMesh(t)){
+                        // TODO: pain sound
+                        cat_scream.play();
+                        console.log("Died!!")
+                        collBox.position = hero_start_pos.clone();
+                    }
+                }
+            }
+
+            if(collBox.intersectsMesh(win_obj)){
+                document.getElementById("win-screen-ctr").style.visibility = "visible";
+            }
+            
 
             var keydown = false;
             //Manage the movements of the character (e.g. position, direction)
@@ -215,7 +236,7 @@ function placePlayer(position, scene){
     loadCat(position, scene);
 }
 
-function placeStraightRoad(position, rotated, scene){
+function placeStraightRoad(position, rotated, safe, scene){
     //console.log("Placing a road tile at " + position.x + ", " + position.z);
     var roadPlane = BABYLON.MeshBuilder.CreateGround("road", {width: 4, height: 4}, scene);
     const roadMat = new BABYLON.StandardMaterial("roadMat");
@@ -226,6 +247,9 @@ function placeStraightRoad(position, rotated, scene){
     }
     roadPlane.material = roadMat;
     roadPlane.position = position.clone();
+    if(!safe){
+        deadly_tiles.push(roadPlane);
+    }
 }
 
 function placeIntersection(position, scene){
@@ -234,6 +258,7 @@ function placeIntersection(position, scene){
     roadMat.diffuseTexture = new BABYLON.Texture("./res/img/road-intersection.png", scene, true, true, 0);
     intersectionPlane.material = roadMat;
     intersectionPlane.position = position.clone();
+    deadly_tiles.push(intersectionPlane);
 }
 
 function generateJumpingBoxes(position, type, rot_deg, scene){
@@ -264,6 +289,28 @@ function generateJumpingBoxes(position, type, rot_deg, scene){
         b_mid.position.z += 1.6;
         grounds.push(b_mid);
     } else if (type == 2){
+
+        const b_mid_1 = BABYLON.MeshBuilder.CreateBox("box", {width: 4, height: 0.2, depth: 0.8 });
+        b_mid_1.physicsImpostor = new BABYLON.PhysicsImpostor(b_mid_1, BABYLON.PhysicsImpostor.BoxImpostor,  {mass:0,
+            friction:0.5,
+            restitution:0}, scene);
+
+            b_mid_1.position = position.clone();
+            b_mid_1.position.x += 0;
+            b_mid_1.position.y += mid_y;
+            b_mid_1.position.z += 1.6;
+        grounds.push(b_mid_1);
+
+        const b_mid_2 = BABYLON.MeshBuilder.CreateBox("box", {width: 0.8, height: 0.2, depth: 3.8 });
+        b_mid_2.physicsImpostor = new BABYLON.PhysicsImpostor(b_mid_2, BABYLON.PhysicsImpostor.BoxImpostor,  {mass:0,
+            friction:0.5,
+            restitution:0}, scene);
+
+            b_mid_2.position = position.clone();
+            b_mid_2.position.x += 1.6;
+            b_mid_2.position.y += mid_y;
+            b_mid_2.position.z -= 0;
+        grounds.push(b_mid_2);
 
     } else if(type == 3){
         if(rot_deg == 0){
@@ -441,8 +488,49 @@ function generateJumpingBoxes(position, type, rot_deg, scene){
             b_mid_2.position.z -= 1.2;
         grounds.push(b_mid_2);
         }
+    } else if(type == 9){
+        const b_mid = BABYLON.MeshBuilder.CreateBox("box", {width: 0.8, height: 0.2, depth: 0.8 });
+
+        b_mid.physicsImpostor = new BABYLON.PhysicsImpostor(b_mid, BABYLON.PhysicsImpostor.BoxImpostor,  {mass:0,
+            friction:0.5,
+            restitution:0}, scene);
+        b_mid.position = position.clone();
+
+        b_mid.position.y = mid_y;
+        b_mid.position.x += 1.6;
+        b_mid.position.z += 1.6;
+    } else if (type == 10){
+        const b_mid_1 = BABYLON.MeshBuilder.CreateBox("box", {width: 4, height: 0.2, depth: 0.8 });
+        b_mid_1.physicsImpostor = new BABYLON.PhysicsImpostor(b_mid_1, BABYLON.PhysicsImpostor.BoxImpostor,  {mass:0,
+            friction:0.5,
+            restitution:0}, scene);
+
+            b_mid_1.position = position.clone();
+            b_mid_1.position.x += 0;
+            b_mid_1.position.y += mid_y;
+            b_mid_1.position.z += 1.6;
+        grounds.push(b_mid_1);
+
+        const b_mid_2 = BABYLON.MeshBuilder.CreateBox("box", {width: 0.8, height: 0.2, depth: 3.8 });
+        b_mid_2.physicsImpostor = new BABYLON.PhysicsImpostor(b_mid_2, BABYLON.PhysicsImpostor.BoxImpostor,  {mass:0,
+            friction:0.5,
+            restitution:0}, scene);
+
+            b_mid_2.position = position.clone();
+            b_mid_2.position.x -= 1.6;
+            b_mid_2.position.y += mid_y;
+            b_mid_2.position.z -= 0;
+        grounds.push(b_mid_2);
     }
     
+}
+
+function generateWinCondition(position, scene){
+    const win_mesh = BABYLON.MeshBuilder.CreateBox("box", {width: 0.2, height: 4, depth: 4 });
+    win_mesh.position = position.clone()
+    win_mesh.position.x -= 1.6;
+    win_mesh.position.y += 2;
+    win_obj = win_mesh;
 }
 
 function generateLevel(scene){
@@ -461,12 +549,13 @@ function generateLevel(scene){
             }
             if((level_item & tile_types.ROAD_STRAIGHT) == tile_types.ROAD_STRAIGHT){
                 let jump_type = level_obstacle_types[i][j];
-                placeStraightRoad(tile_position, false, scene);
+                let safe = (level_item & tile_types.PLAYER_START) == tile_types.PLAYER_START;
+                placeStraightRoad(tile_position, false, safe, scene);
                 generateJumpingBoxes(tile_position, jump_type, 0, scene);
             }
             if((level_item & tile_types.ROAD_STRAIGHT_ROT) == tile_types.ROAD_STRAIGHT_ROT){
                 let jump_type = level_obstacle_types[i][j];
-                placeStraightRoad(tile_position, true, scene);
+                placeStraightRoad(tile_position, true, false, scene);
                 generateJumpingBoxes(tile_position, jump_type, 90, scene);
             }
             if((level_item  & tile_types.ROAD_INTERSECTION) == tile_types.ROAD_INTERSECTION){
@@ -476,6 +565,9 @@ function generateLevel(scene){
             }
             if((level_item & tile_types.BUILDING) == tile_types.BUILDING){
                 createBuilding(tile_position, scene);
+            }
+            if((level_item & tile_types.EXIT) == tile_types.EXIT){
+                generateWinCondition(tile_position, scene);
             }
 
         }
@@ -506,7 +598,7 @@ var createScene = function () {
     //camera.setTarget(BABYLON.Vector3.Zero());
 
     // This attaches the camera to the canvas
-    //camera.attachControl(canvas, true);
+    camera1.attachControl(canvas, true);
 
     // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
     var light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -540,6 +632,11 @@ var createScene = function () {
     scene.actionManager.registerAction(new BABYLON.ExecuteCodeAction(BABYLON.ActionManager.OnKeyUpTrigger, function (evt) {
         inputMap[evt.sourceEvent.key] = evt.sourceEvent.type == "keydown";
     }));
+
+    var music = new BABYLON.Sound("Music", "res/snd/462494__rucisko__busy-city-05.wav", scene, null, {
+        loop: true,
+        autoplay: true
+      });
 
     return scene;
 };
