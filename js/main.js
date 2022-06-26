@@ -87,6 +87,9 @@ function loadCat(position, scene){
     collBox.position.y = 1;
 
     hero_start_pos = collBox.position.clone();
+    document.getElementById("ok").onclick = function(){
+        window.location.reload();
+    }
 
     var cat_scream = new BABYLON.Sound("gunshot", "res/snd/415209__inspectorj__cat-screaming-a.wav", scene);
     //collBox.rotate(new BABYLON.Vector3(0, 1, 0), Math.PI/2);
@@ -149,7 +152,8 @@ function loadCat(position, scene){
             }
 
             if(collBox.intersectsMesh(win_obj)){
-                document.getElementById("win-screen-ctr").style.visibility = "visible";
+                document.getElementById("win-scr-container").style.visibility = "visible";
+                return;
             }
             
 
